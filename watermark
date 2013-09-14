@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+require 'logger'
+require 'rubygems'
+require 'RMagick'
+require 'fileutils'
+
+
+log = Logger.new(STDOUT)
+log.debug('log created')
+
+$queue = '/images_queue/'
+$original = '/images_original/'
+$watermarked = '/images/'
+
+#$mark_main = Magick::Image.read('/home/florent/Documents/Akretion/wiki_screenshots/watermark/openerpbrasil-watermark.png')[0]
+#$mark_small = Magick::Image.read('/home/florent/Documents/Akretion/wiki_screenshots/watermark/openerpbrasil-watermark-small.png')[0]
+#$mark_main = Magick::Image.read('./openerpbrasil-watermark.png')[0]
+#$mark_small = Magick::Image.read('./openerpbrasil-watermark-small.png')[0]
+
+def replicate_dir(f)
+    out_original = f.sub($queue,$original)
+    out_watermarked = f.sub($queue,$watermarked)
+    if !File.exist?(out_original) && !File.exist?(out_watermarked)
+        FileUtils.mkdir(out_original)
+        FileUtils.mkdir(out_watermarked)        
+    end
+end
+
+def replicate_img(f)
+
+mark_main = Magick::Image.read('./openerpbrasil-watermark.png')[0]
+mark_small = Magick::Image.read('./openerpbrasil-watermark-small.png')[0]
+
+        image = Magick::Image.read(f)[0]
+
+        out_original = f.sub($queue,$original) #attention si les fichiers s'appellent queue...
+        if File.exist?(out_original)
+            l = out_original.split(".") 
+            l[-2] += '-rejected'
+            out_original = l.join(".")
+        end
+	image.write(out_original)
+
+        #get image dimensions
+        h = image.rows
+        w = image.columns
+        max_dim = [w,h,600].max  
+        
+        #resize logos accordingly:
+        logo_main = mark_main.resize_to_fit!(max_dim/4)
+        logo_small = mark_small.resize_to_fit!(max_dim/8)
+        
+        result = image.composite(logo_main, Magick::CenterGravity, Magick::OverCompositeOp)
+        result = result.composite(logo_small, Magick::SouthEastGravity, Magick::OverCompositeOp)
+        
+        out_watermarked = f.sub($queue,$watermarked)
+        if File.exist?(out_watermarked)
+            l = out_watermarked.split(".")        
+            l[-2] += '-rejected'
+            out_watermarked = l.join(".")
+        end
+        result.write(out_watermarked)
+        
+        FileUtils.rm(f)
+
+#        logo_main.destroy!
+#        logo_small.destroy!
+end
+
+Dir.glob('/home/ubuntu/wiki61/documentacao-funcional/documentacao-fiscal/images_queue/**/*') do |f|
+    log.debug('boucle')
+
+    if File.directory?(f)
+        replicate_dir(f)
+    end
+
+    if f.end_with?('.png') or f.end_with?('jpg')
+        replicate_img(f)
+    end
+end
+
+
+
